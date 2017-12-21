@@ -1,8 +1,13 @@
 ; ***********************************************************************************************************************
-; TPLgen, V001 January 2017, Dion Methorst
+; TPLgen, V002 April 2017, Dion Methorst
 ;
 ; Generates a Tecan Evoware TPL file from scan.csv file in any pre-defined 96 position matrix as defined in TPLgen.ini file
 ; Run TPLgen.exe for a first time to create an initial TPLgen.ini file then edit the TPLgen.ini file
+;
+; ************************************************************************************************************************
+; changelog:
+; V001		jan 2017 first version
+; V002		april 2017 added functionality for sequential or serial distribution of samples
 ;
 ; ************************************************************************************************************************
 ; TPLgen.ini file example below:
@@ -14,7 +19,8 @@
 ;[Orientation]
 ; Change as desired but please notice:TPLgen.ini is rebuild to default after deletion
 ; Orientation of sample distribution is specified as TB (TopToBottomLeftToRight) or LR (LeftToRightTopToBottom)
-;Orientation=TB
+; Orientation=TB
+; Distribution=sequential
 ;
 ;[Samples]
 ; Enter, add or change each sample dilution
@@ -99,11 +105,11 @@
 Dim $TPLgenIni = @Scriptdir & "\TPLgen.ini"
 
 If not FileExists($TPLgenIni) then
-	Local $Orient	="Orientation=TB" & @CRLF
+	Local $Orient	="Orientation=TB" & @LF & "Distribution=Sequential" & @CRLF
 	Local $Samples	="1=V1" & @LF & "1=V2" & @CRLF
 	Local $SampleData="MaxCarrier=4" & @LF & "MtpMaxSample=-1" & @CRLF
 	Local $Cereal	="ST1=10" & @LF & "ST2=20" & @LF & "ST3=80" & @LF & "ST4=120" & @LF & "ST5=180" _
-						& @LF & "ST6=220" & @LF & "ST7=250" & @CRLF
+					& @LF & "ST6=220" & @LF & "ST7=250" & @CRLF
 	Local $STData	="Startposition=[A-H][1-12]" & @LF & "Replicates=1" & @LF & "Orientation=V" & @CRLF
 	Local $Trols	="CT1=10" & @LF & "CT2=20" & @CRLF
 	Local $TrolData	="Replicates=1" & @LF & "Orientation=V" & @LF & "CT1pos=[A-H][1-12]" & @LF & "CT2pos=[A-H][1-12]" & @CRLF
@@ -126,7 +132,10 @@ If not FileExists($TPLgenIni) then
 
 	$iniComments = _IniWriteSectionComment($TPLgenIni, "Orientation", "TPLgen.exe, Sanquin Amsterdam, Dion Methorst Jan 2017|TPLgen.exe requires proper data entry in the fields below:|Please make sure your entries are correct!|",1)
 	$iniComments = _IniWriteSectionComment($TPLgenIni, "Orientation", "Orientation of sample distribution is specified as TB (TopToBottomLeftToRight) or LR (LeftToRightTopToBottom)", 0)
-	$iniComments = _IniWriteSectionComment($TPLgenIni, "Orientation", "Change as desired but please notice:TPLgen.ini is rebuild to default after deletion",0)
+	$iniComments = _IniWriteSectionComment($TPLgenIni, "Orientation", "Distribution of sample dilutions: sequential or serial", 0)
+	$iniComments = _IniWriteSectionComment($TPLgenIni, "Orientation", "Sequential: Sample1_V1,V2,V3, Sample2_V1,V2,V3 etc or", 0)
+	$iniComments = _IniWriteSectionComment($TPLgenIni, "Orientation", "Serial: Sample1_V1, Sample2_V1, Sample3_V1, Sample1_V2, Sample2_V2, Sample3_V2", 0)
+	$iniComments = _IniWriteSectionComment($TPLgenIni, "Orientation", "Change as desired but please notice:TPLgen.ini is rebuild to default after deletion", 0)
 	$iniComments = _IniWriteSectionComment($TPLgenIni, "Samples", "Enter, add or change each sample dilution|Left side is number of replicates, right side Evoware dilution range designator", 0)
 	$iniComments = _IniWriteSectionComment($TPLgenIni, "SampleData", "If MtpMaxSample = -1 the maximum No of samples will be calculated from the other TPLgen.ini data", 0)
 	$iniComments = _IniWriteSectionComment($TPLgenIni, "SampleData", "Specify the maximum amount of sample carriers that can be used|Also specify the maximum number of samples per MTP/assay",0)
@@ -193,11 +202,11 @@ Func _Matrix(ByRef $aOrientation, ByRef $aStdData, ByRef $aControlData, ByRef $a
 
 Local $aCol = [8,"A","B","C","D","E","F","G","H"]
 Local $aRow = [12,1,2,3,4,5,6,7,8,9,10,11,12]
-	_arraydisplay($aCol)
+;	_arraydisplay($aCol)
 
 local $Positions = $aCol[0] * $aRow[0]
 Local $aMatrix = [$Positions]
-	msgbox(64 + 262144,"",$Positions,$aOrientation[1][1])
+;	msgbox(64 + 262144,"",$Positions,$aOrientation[1][1])
 
 ;Set up matrix array
 $Orientation = $aOrientation[1][1]
@@ -259,7 +268,7 @@ For $i = 1 to $aStdData[2][1] ; 1 to number of replicates
 			EndSelect
 	EndSelect
 Next
-
+;_arraydisplay($aMatrix)
 ;Fill Matrix array with Controls
 For $i = 1 to $aControlData[1][1] ; 1 to number of replicates
 	Select
@@ -268,7 +277,9 @@ For $i = 1 to $aControlData[1][1] ; 1 to number of replicates
 				Case $aControlData[2][1]= "H"	;horizontal, only when $Orientation = "LR"
 					For $j = 1 to $aControls[0][0]
 						$posC = _arraysearch($aMatrix,$aControlData[$j+2][1],1,$aMatrix[0][1],0,0,1,-1,False)+(($i-1)*12)
-						If $aMatrix[$posC][0] = "" AND $posC<96 then
+						msgbox(4096,"", $posC);msgbox(4096,"", $aMatrix[$posC][0]& " " & $posC)
+						_arraydisplay($aMatrix)
+						If $aMatrix[$posC][0] = "" AND $posC <= 96 then
 							$aMatrix[$posC][0] = $aControls[$j][0]
 							$aMatrix[$posC][2] = $aControls[$j][1]
 						Else
@@ -278,7 +289,7 @@ For $i = 1 to $aControlData[1][1] ; 1 to number of replicates
 				Case $aControlData[2][1]= "V"	;vertical, only when $Orientation = "TB"
 					For $j = 1 to $aControls[0][0]
 						$posC = _arraysearch($aMatrix,$aControlData[$j+2][1],1,$aMatrix[0][1],0,0,1,-1,False)+($i-1)
-						If $aMatrix[$posC][0] = "" AND $posC<96 then
+						If $aMatrix[$posC][0] = "" AND $posC <= 96 then
 							$aMatrix[$posC][0] = $aControls[$j][0]
 							$aMatrix[$posC][2] = $aControls[$j][1]
 						Else
@@ -291,7 +302,9 @@ For $i = 1 to $aControlData[1][1] ; 1 to number of replicates
 				Case $aControlData[2][1]= "H" ;horizontal, only when $Orientation = "LR"
 					For $j = 1 to $aControls[0][0]
 						$posC = _arraysearch($aMatrix,$aControlData[$j+2][1],1,$aMatrix[0][1],0,0,1,-1,False)+(($i-1)*8)
-						If $aMatrix[$posC][0] = "" AND $posC<96 then
+						;msgbox(4096,"", $posC);msgbox(4096,"", $aMatrix[$posC][0]& " " & $posC)
+						;_arraydisplay($aMatrix)
+						If $aMatrix[$posC][0] = "" AND $posC <= 96 then
 							$aMatrix[$posC][0] = $aControls[$j][0]
 							$aMatrix[$posC][2] = $aControls[$j][1]
 						Else
@@ -300,9 +313,12 @@ For $i = 1 to $aControlData[1][1] ; 1 to number of replicates
 					Next
 				Case $aControlData[2][1]= "V"  ;vertical, only when $Orientation = "TB"
 											;msgbox(64 + 262144,"startposition",$aControlData[1][1] & " & " & $aMatrix[0][1])
+					;_arraydisplay($aControlData)
 					For $j = 1 to $aControls[0][0]
 						$posC = _arraysearch($aMatrix,$aControlData[$j+2][1],1,$aMatrix[0][1],0,0,1,-1,False)+($i-1)
-						If $aMatrix[$posC][0] = "" AND $posC<96 then
+						;msgbox(4096,"", $posC);msgbox(4096,"", $aMatrix[$posC][0]& " " & $posC)
+						;_arraydisplay($aMatrix)
+						If $aMatrix[$posC][0] = "" AND $posC <= 96 then
 							$aMatrix[$posC][0] = $aControls[$j][0]
 							$aMatrix[$posC][2] = $aControls[$j][1]
 						Else
@@ -312,7 +328,7 @@ For $i = 1 to $aControlData[1][1] ; 1 to number of replicates
 			EndSelect
 	EndSelect
 Next
-
+;_arraydisplay($aMatrix)
 ;Fill Matrix with Blanks
 For $i = 1 to $aBlankData[1][1] ; 1 to number of replicates
 	Select
@@ -321,7 +337,7 @@ For $i = 1 to $aBlankData[1][1] ; 1 to number of replicates
 				Case $aBlankData[2][1]= "H"	;horizontal, only when $Orientation = "LR"
 					For $j = 1 to $aBlank[0][0]
 						$posC = _arraysearch($aMatrix,$aBlankData[$j+2][1],1,$aMatrix[0][1],0,0,1,-1,False)+(($i-1)*12)
-						If $aMatrix[$posC][0] = "" AND $posC <=96 then
+						If $aMatrix[$posC][0] = "" AND $posC <= 96 then
 							$aMatrix[$posC][0] = $aBlank[$j][0]
 							$aMatrix[$posC][2] = $aBlank[$j][1]
 						Else
@@ -331,7 +347,7 @@ For $i = 1 to $aBlankData[1][1] ; 1 to number of replicates
 				Case $aBlankData[2][1]= "V"	;vertical, only when $Orientation = "TB"
 					For $j = 1 to $aBlank[0][0]
 						$posC = _arraysearch($aMatrix,$aBlankData[$j+2][1],1,$aMatrix[0][1],0,0,1,-1,False)+($i-1)
-						If $aMatrix[$posC][0] = "" AND $posC<=96 then
+						If $aMatrix[$posC][0] = "" AND $posC <= 96 then
 							$aMatrix[$posC][0] = $aBlank[$j][0]
 							$aMatrix[$posC][2] = $aBlank[$j][1]
 						Else
@@ -344,7 +360,7 @@ For $i = 1 to $aBlankData[1][1] ; 1 to number of replicates
 				Case $aBlankData[2][1]= "H" ;horizontal, only when $Orientation = "LR"
 					For $j = 1 to $aBlank[0][0]
 						$posC = _arraysearch($aMatrix,$aBlankData[$j+2][1],1,$aMatrix[0][1],0,0,1,-1,False)+(($i-1)*8)
-						If $aMatrix[$posC][0] = "" AND $posC<=96 then
+						If $aMatrix[$posC][0] = "" AND $posC <= 96 then
 							$aMatrix[$posC][0] = $aBlank[$j][0]
 							$aMatrix[$posC][2] = $aBlank[$j][1]
 						Else
@@ -356,7 +372,7 @@ For $i = 1 to $aBlankData[1][1] ; 1 to number of replicates
 					For $j = 1 to $aBlank[0][0]
 						$posC = _arraysearch($aMatrix,$aBlankData[$j+2][1],1,$aMatrix[0][1],0,0,1,-1,False)+($i-1)
 												;msgbox(0,"startposition",$aMatrix[$pos][1])
-						If $aMatrix[$posC][0] = "" AND $posC<=96 then
+						If $aMatrix[$posC][0] = "" AND $posC <= 96 then
 							$aMatrix[$posC][0] = $aBlank[$j][0]
 							$aMatrix[$posC][2] = $aBlank[$j][1]
 						Else
@@ -366,7 +382,7 @@ For $i = 1 to $aBlankData[1][1] ; 1 to number of replicates
 			EndSelect
 	EndSelect
 Next
-
+;_arraydisplay($aMatrix)
 return $aMatrix
 
 EndFunc;Create Matrix array, matrix will be filled with TPLgen.ini data and Scan.csv data
@@ -433,82 +449,170 @@ $TPLname	= StringTrimleft($aScanFile[$aScanFile[0]],StringInStr($aScanFile[$aSca
 			EndIf
 
 local $aSampleID = [$aScanfile[0]]
-	_ArrayDisplay($aSampleID)
+;_ArrayDisplay($aScanFile)
+;_ArrayDisplay($aSampleID)
 
 ; SampleIDs from Scanfile.csv read to array $aScanFile
 $q = 0
 For $p = 1 to $aScanFile[0]-1
 	If StringLeft($aScanFile[$p],1) <= $aSampleData[1][1] then
 		$SampleID = StringTrimleft ($aScanFile[$p],StringInStr($aScanFile[$p],";",0,-1))
-		If Stringmid($aScanFile[$p],2,1) <> ";" then
-			$q += 1
-		ElseIf Stringleft($aScanFile[$p],1) <= $aSampleData[1][1] then
 			_arrayAdd($aSampleID, $SampleID)
-			$aSampleID[0] = $p - $q -1
-		EndIf
+			$aSampleID[0] = Ubound($aSampleId)-1;$p - $q -1
 	EndIf
 Next
+;_ArrayDisplay($aSampleID)
+
 
 ;Extract all empty indices from $aTPLtrix array to loop over and fill with the SampleIDs.
 $aEmptyIndex = _ArrayFindAll($aTPLtrix, "" ,0);_ArrayFindAll ( Const ByRef $aArray, $vValue [, $iStart = 0 [, $iEnd = 0 [, $iCase = 0 [, $iCompare = 0 [, $iSubItem = 0 [, $bRow = False]]]]]] )
 $aEmptyIndex[0] = Ubound($aEmptyIndex)-1
 
-	msgbox(48 + 262144, "TrayID/ TPL-file name", $TPLname)
-	_ArrayDisplay($aSampleID,"SampleID")
-	_ArrayDisplay($aTPLtrix, "96Matrix")
-	_ArrayDisplay($aSamples, "replicateDil")
-	msgbox(48 + 262144,"",$aSampleData[2][1] & " " & $aSamples[1][0] & " " & $aSampleID[0])
-	_arraydisplay($aEmptyIndex, "Available positions")
+;	msgbox(48 + 262144, "TrayID/ TPL-file name", $TPLname)
+;	_ArrayDisplay($aSampleID,"SampleID")
+;	_ArrayDisplay($aTPLtrix, "96Matrix")
+;	_ArrayDisplay($aSamples, "replicateDil")
+;	msgbox(48 + 262144,"",$aSampleData[2][1] & " " & $aSamples[1][0] & " " & $aSampleID[0])
+;	_arraydisplay($aEmptyIndex, "Available positions")
 
-;#CS
 ;Add Samples and Dilution range designator to $aTPLtrix matrix array
-Select
-	Case $aSamples[0][0] = 1 AND $aSamples[1][0] = 1; only one dilution range per sample i.e. V1 or V2 or Vx
-		$j= 1
-		For $i = 1 to Ubound($aEmptyIndex);Ubound($aSampleID)
-				$aTPLtrix[$aEmptyIndex[$i]][0] = $aSampleID[$j]
-				$aTPLtrix[$aEmptyIndex[$i]][2] = $aSamples[1][1]
-			$j += 1
-			If $j = $aSampleID[0] then ExitLoop
-		Next
-	Case $aSamples[0][0] = 1 AND $aSamples[1][0] > 1;  2 replicates or more & only one dilution range per sample i.e. V1 or V2 or Vx
-		If ($aEmptyIndex[0]/$aSamples[1][0]) >= $aSampleID[0] then
-			$j= 1
-			For $i = 1 to Ubound($aEmptyIndex) ;Ubound($aSampleID)
-				For $k = 1 to $aSamples[1][0]
-					$aTPLtrix[$aEmptyIndex[$i+($k-1)]][0] = $aSampleID[$j]
-					$aTPLtrix[$aEmptyIndex[$i+($k-1)]][2] = $aSamples[1][1]
-				Next
-				$j += 1
-				$i += 1
-				If $j-1 = $aSampleID[0] then ExitLoop
-			Next
-		Else
-				MsgBox(48 + 262144, "TPLgen Error", "Maximum number of samples exceeded!",20)
-		EndIf
-	Case $aSamples[0][0] > 1 ; possibly more then one dilution range per sample V1 and V2 and Vx
-		If ($aEmptyIndex[0]/$aSamples[0][0]) >= $aSampleID[0] then
-			$j= 1
-			For $i = 1 to Ubound($aEmptyIndex) ;Ubound($aSampleID)
-				If $aTPLtrix[$aEmptyIndex[$i]][0] = "" then
-					For $k = 1 to $aSamples[0][0]
-						$aTPLtrix[$aEmptyIndex[$i+($k-1)]][0] = $aSampleID[$j]
-						$aTPLtrix[$aEmptyIndex[$i+($k-1)]][2] = $aSamples[$k][1]
-					Next
-					$j += 1
-					$i += 1
-				ElseIf $aTPLtrix[$aEmptyIndex[$i]][0] = "" Then
-					$i +=1
-				EndIf
-				If $j-1 = $aSampleID[0] then ExitLoop
-			Next
-		Else
-				MsgBox(48 + 262144, "TPLgen Error", "Maximum number of samples exceeded!",20)
-		EndIf
-EndSelect
 
-	_ArrayDisplay($aTPLtrix)
-	;#CE
+;msgbox(4096,"$m", "$aOrientation[2][1] = " & $aOrientation[2][1])
+Select
+	Case $aOrientation[2][1] = "Sequential"
+		Select
+			Case $aSamples[0][0] = 1 AND $aSamples[1][0] = 1; only one dilution range per sample i.e. V1 or V2 or Vx
+				$j= 1
+				For $i = 1 to Ubound($aEmptyIndex);Ubound($aSampleID)
+						$aTPLtrix[$aEmptyIndex[$i]][0] = $aSampleID[$j]
+						$aTPLtrix[$aEmptyIndex[$i]][2] = $aSamples[1][1]
+					$j += 1
+					If $j = $aSampleID[0] then ExitLoop
+				Next
+			Case $aSamples[0][0] = 1 AND $aSamples[1][0] > 1;  2 replicates or more & only one dilution range per sample i.e. V1 or V2 or Vx
+				If ($aEmptyIndex[0]/$aSamples[1][0]) >= $aSampleID[0] then
+					$j= 1
+					For $i = 1 to Ubound($aEmptyIndex) ;Ubound($aSampleID)
+						For $k = 1 to $aSamples[1][0]
+							$aTPLtrix[$aEmptyIndex[$i+($k-1)]][0] = $aSampleID[$j]
+							$aTPLtrix[$aEmptyIndex[$i+($k-1)]][2] = $aSamples[1][1]
+						Next
+						$j += 1
+						$i += 1
+						If $j-1 = $aSampleID[0] then ExitLoop
+					Next
+				Else
+						MsgBox(48 + 262144, "TPLgen Error", "Maximum number of samples exceeded!",20)
+				EndIf
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			;verdunningen achter elkaar
+			Case $aSamples[0][0] > 1 AND $aSamples[1][0] > 1;  2 replicates or more &  dilution range > 1 per sample i.e. V1 or V2 or Vx
+				If ($aEmptyIndex[0]/$aSamples[1][0]) >= $aSampleID[0] then
+					$j= 1
+					For $i = 1 to Ubound($aEmptyIndex)
+						For $k = 1 to ($aSamples[0][0] + $aSamples[1][0])
+							$m = ($k - (-1 + (-1^$i) / 2))/2
+							$m = Floor($m)
+							;msgbox(4096,"$m", "$m = " & $m)
+							$aTPLtrix[$aEmptyIndex[$i+($k-1)]][0] = $aSampleID[$j]
+							$aTPLtrix[$aEmptyIndex[$i+($k-1)]][2] = $aSamples[$m][1]
+						Next
+						$j += 1
+						$i += ($aSamples[1][0] + $aSamples[1][0])-1
+						If $j-1 = $aSampleID[0] then ExitLoop
+					Next
+				Else
+						MsgBox(48 + 262144, "TPLgen Error", "Maximum number of samples exceeded!",20)
+				EndIf
+			Case $aSamples[0][0] > 1 AND $aSamples[1][0] = 1; possibly more then one dilution range per sample V1 and V2 and Vx
+				If ($aEmptyIndex[0]/$aSamples[0][0]) >= $aSampleID[0] then
+					$j= 1
+					For $i = 1 to Ubound($aEmptyIndex) ;Ubound($aSampleID)
+						If $aTPLtrix[$aEmptyIndex[$i]][0] = "" then
+							For $k = 1 to $aSamples[0][0]
+								$aTPLtrix[$aEmptyIndex[$i+($k-1)]][0] = $aSampleID[$j]
+								$aTPLtrix[$aEmptyIndex[$i+($k-1)]][2] = $aSamples[$k][1]
+							Next
+							$j += 1
+							$i += 1
+						ElseIf $aTPLtrix[$aEmptyIndex[$i]][0] = "" Then
+							$i +=1
+						EndIf
+						If $j-1 = $aSampleID[0] then ExitLoop
+					Next
+				Else
+						MsgBox(48 + 262144, "TPLgen Error", "Maximum number of samples exceeded!",20)
+				EndIf
+		EndSelect
+
+	Case $aOrientation[2][1] = "Serial"
+		Select
+			;verdunningen in serie
+			Case $aSamples[0][0] > 1 AND $aSamples[1][0] > 1;  dilution range > 1 per sample i.e. V1 or V2 or Vx AND 2 replicates or more
+				;MsgBox(48 + 262144, "TPLgen calc", $aEmptyIndex[0] &" "& $aSamples[1][0] &" "& $aSamples[0][0])
+				If ($aEmptyIndex[0]/($aSamples[1][0]*$aSamples[0][0])) >= $aSampleID[0] then
+					$V = 1
+					$SerialCount = 1
+					;$iD = 1
+					For $Replicate = 1 to $aSamples[1][0]
+						$iD = 1
+						For $i = $SerialCount to Ubound($aEmptyIndex);($aSamples[0][0] + $aSamples[1][0])
+							If $aTPLtrix[$aEmptyIndex[$i]][0] = "" then
+								For $k = 1 to $aSamples[0][0]
+									$aTPLtrix[$aEmptyIndex[$i+($k-1)]][0] = $aSampleID[$iD]
+									$aTPLtrix[$aEmptyIndex[$i+($k-1)]][2] = $aSamples[$V][1]
+									;MsgBox(48 + 262144, "TPLgen calc", $aTPLtrix[$aEmptyIndex[$i+($k-1)]][2] &" "& $aSampleID[$iD] & @CRLF & $aEmptyIndex[0]&" "& $aSamples[1][0] &" "& $aSamples[0][0] &" "& $iD)
+								   ;_ArrayDisplay($aTPLtrix, "96Matrix")
+								Next
+								$iD += 1
+								$i+=1
+								if $iD = ($aEmptyIndex[0]/($aSamples[1][0]*$aSamples[0][0]))+1 then ExitLoop ;Ceiling or Floor?
+							ElseIf $aTPLtrix[$aEmptyIndex[$i]][0] = "" Then
+							$i +=1
+							EndIf
+						;If $j-1 = $aSampleID[0] then ExitLoop
+						Next
+						$SerialCount = ($aEmptyIndex[0]/($aSamples[1][0]*$aSamples[0][0]))+1
+						;MsgBox(48 + 262144, "TPLgen calc", $SerialCount)
+						$V += 1
+					Next
+				Else
+						MsgBox(48 + 262144, "TPLgen Error", "Maximum number of samples exceeded!",20)
+				EndIf
+			;
+			Case $aSamples[0][0] = 1 AND $aSamples[1][0] > 1;  2 replicates or more &  dilution range = 1 per sample i.e. V1
+				;MsgBox(48 + 262144, "TPLgen calc", $aEmptyIndex[0] &" "& $aSamples[1][0] &" "& $aSamples[0][0])
+				If ($aEmptyIndex[0]/($aSamples[1][0]*$aSamples[0][0])) >= $aSampleID[0] then
+					$V = 1
+					$SerialCount = 1
+					;$iD = 1
+					For $Replicate = 1 to $aSamples[1][0]
+						$iD = 1
+						For $i = $SerialCount to Ubound($aEmptyIndex);($aSamples[0][0] + $aSamples[1][0])
+							If $aTPLtrix[$aEmptyIndex[$i]][0] = "" then
+								For $k = 1 to $aSamples[0][0]
+									$aTPLtrix[$aEmptyIndex[$i+($k-1)]][0] = $aSampleID[$iD]
+									$aTPLtrix[$aEmptyIndex[$i+($k-1)]][2] = $aSamples[$V][1]
+									;MsgBox(48 + 262144, "TPLgen calc", $aTPLtrix[$aEmptyIndex[$i+($k-1)]][2] &" "& $aSampleID[$iD] & @CRLF & $aEmptyIndex[0]&" "& $aSamples[1][0] &" "& $aSamples[0][0] &" "& $iD)
+								   ;_ArrayDisplay($aTPLtrix, "96Matrix")
+								Next
+								$iD += 1
+								$i+=1
+								if $iD = ($aEmptyIndex[0]/($aSamples[1][0]*$aSamples[0][0]))+1 then ExitLoop ;Ceiling or Floor?
+							ElseIf $aTPLtrix[$aEmptyIndex[$i]][0] = "" Then
+							$i +=1
+							EndIf
+						;If $j-1 = $aSampleID[0] then ExitLoop
+						Next
+						$SerialCount = ($aEmptyIndex[0]/($aSamples[1][0]*$aSamples[0][0]))+1
+						;MsgBox(48 + 262144, "TPLgen calc", $SerialCount)
+						$V += 1
+					Next
+				Else
+						MsgBox(48 + 262144, "TPLgen Error", "Maximum number of samples exceeded!",20)
+				EndIf
+		EndSelect
+EndSelect
 
 ;delete empty cells from $aTPLtrix matrix
 $j= 1
